@@ -6,7 +6,7 @@ def stream_user_ages():
         connection = mysql.connector.connect(
             host='localhost',
             user='root',
-            password='akram12345',
+            password='',
             database='ALX_prodev'
         )
 

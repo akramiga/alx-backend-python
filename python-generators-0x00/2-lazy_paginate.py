@@ -6,7 +6,7 @@ def paginate_users(page_size, offset):
         connection = mysql.connector.connect(
             host='localhost',
             user='root',
-            password='akram12345',  # Use your own password
+            password='',  
             database='ALX_prodev'
         )
 
