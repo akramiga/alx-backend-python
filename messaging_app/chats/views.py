@@ -1,45 +1,34 @@
-from django.shortcuts import render
-from rest_framework import filters
-from rest_framework import viewsets, status
+from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from .models import Conversation, Message
-from .serializers import ConversationSerializer, MessageSerializer
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
-
+from .serializers import (
+    ConversationSerializer, ConversationCreateSerializer,
+    MessageSerializer, MessageCreateSerializer
+)
 
 class ConversationViewSet(viewsets.ModelViewSet):
     queryset = Conversation.objects.all()
-    serializer_class = ConversationSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['participants__username', 'participants__email']
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['participants__first_name', 'participants__last_name']
+    ordering_fields = ['created_at']
 
-    def get_queryset(self):
-        # Only show conversations that include the current user
-        return self.queryset.filter(participants=self.request.user)
-
-    def perform_create(self, serializer):
-        # Add the logged-in user as a participant in the new conversation
-        conversation = serializer.save()
-        conversation.participants.add(self.request.user)
-
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return ConversationCreateSerializer
+        return ConversationSerializer
 
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()
-    serializer_class = MessageSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['message_body', 'sender__username']
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['message_body', 'sender__first_name', 'sender__last_name']
+    ordering_fields = ['sent_at']
 
-
-    def get_queryset(self):
-        # Only return messages from conversations the user is part of
-        return self.queryset.filter(conversation__participants=self.request.user)
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return MessageCreateSerializer
+        return MessageSerializer
 
     def perform_create(self, serializer):
-        # Automatically set the sender to the logged-in user
         serializer.save(sender=self.request.user)
-

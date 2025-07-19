@@ -1,128 +1,76 @@
-# Python Utility Modules
+# Unittests and Integration Tests for ALX Backend Python Project
 
-A collection of Python utility modules providing functionality for nested data access, data processing, and GitHub API interaction.
+## Project Overview
 
-## Modules
+This project demonstrates the implementation of **unit tests** and **integration tests** for Python functions and classes, focusing on best practices like **mocking**, **parameterization**, and **fixtures**. It primarily tests a `GithubOrgClient` class that interacts with the GitHub API and utility functions for nested map access and HTTP requests.
 
-### `utils.py`
-Core utility functions and classes for data manipulation and HTTP requests.
-
-### `client.py` 
-GitHub API client for interacting with organization data and repositories.
+---
 
 ## Features
 
-- **Nested Map Access**: Safe traversal of nested dictionary structures
-- **Data Processing**: Filter and analyze dictionary-based datasets
-- **HTTP JSON Fetching**: Robust JSON data retrieval from web APIs
-- **GitHub API Integration**: Easy access to GitHub organization and repository data
+- **Unit Tests** for:
+  - Utility functions (`access_nested_map`, `get_json`, `memoize`)
+  - `GithubOrgClient` methods including `org`, `public_repos`, and license checking.
+  
+- **Integration Tests** for:
+  - End-to-end testing of `GithubOrgClient.public_repos` with fixture data.
+  - Mocking external HTTP requests using `unittest.mock.patch`.
+  
+- Use of **parameterized tests** to test multiple inputs and edge cases cleanly.
+- Clear separation between unit and integration tests.
+- Use of Python’s built-in `unittest` framework and `parameterized` library.
 
-## Installation
+---
 
-### Prerequisites
-- Python 3.6 or higher
+## Requirements
+
+- Python 3.7+
 - `requests` library
+- `parameterized` library
 
-### Setup
-1. Install the required dependency:
+Install dependencies with:
+
 ```bash
-pip install requests
+pip install requests parameterized
+````
+
+---
+
+## File Structure
+
+```
+.
+├── client.py              # GithubOrgClient implementation and get_json
+├── fixtures.py            # JSON fixtures for integration tests
+├── test_client.py         # Unit and integration tests for client.py
+├── utils.py               # Utility functions like access_nested_map and memoize
+├── test_utils.py          # Unit tests for utils.py
+└── README.md              # This file
 ```
 
-2. Download or clone the modules:
+---
+
+## Running Tests
+
+Run all tests with:
+
 ```bash
-# If using git
-git clone <your-repository-url>
-cd <repository-directory>
-
-# Or download the files directly
-# - utils.py
-# - client.py
+python3 -m unittest discover
 ```
 
-## Usage
+Or run individual test files:
 
-### utils.py
-
-#### `access_nested_map(nested_map, path)`
-Safely access values in nested dictionaries using a sequence of keys.
-
-```python
-from utils import access_nested_map
-
-# Example usage
-data = {
-    "user": {
-        "profile": {
-            "name": "Alice",
-            "settings": {"theme": "dark"}
-        }
-    }
-}
-
-# Access nested values
-name = access_nested_map(data, ("user", "profile", "name"))
-# Returns: "Alice"
-
-theme = access_nested_map(data, ("user", "profile", "settings", "theme"))
-# Returns: "dark"
+```bash
+python3 -m unittest test_client.py
+python3 -m unittest test_utils.py
 ```
 
-#### `DataProcessor` Class
-Process and analyze lists of dictionary data.
+---
 
-```python
-from utils import DataProcessor
+## Testing Highlights
 
-# Sample data
-users = [
-    {"id": 1, "name": "Alice", "city": "New York", "age": 25},
-    {"id": 2, "name": "Bob", "city": "London", "age": 30},
-    {"id": 3, "name": "Charlie", "city": "New York", "age": 28},
-]
+* **Mocking external calls:** No real HTTP requests are made during tests.
+* **Parameterization:** Multiple test scenarios tested elegantly with minimal code.
+* **Fixtures:** Realistic sample data used for integration tests to simulate GitHub API responses.
 
-processor = DataProcessor(users)
-
-# Filter by key-value pairs
-ny_users = processor.filter_by_key_value("city", "New York")
-# Returns: [{"id": 1, "name": "Alice", ...}, {"id": 3, "name": "Charlie", ...}]
-
-# Get all unique keys
-keys = processor.get_all_keys()
-# Returns: ["age", "city", "id", "name"]
-```
-
-#### `get_json(url)`
-Fetch JSON data from web APIs.
-
-```python
-from utils import get_json
-
-# Fetch data from an API
-data = get_json("https://api.github.com/users/octocat")
-print(data["login"])  # "octocat"
-```
-
-### client.py
-
-#### `GithubOrgClient` Class
-Interact with GitHub's public organization API.
-
-```python
-from client import GithubOrgClient
-
-# Initialize client for an organization
-client = GithubOrgClient("google")
-
-# Get organization information
-org_info = client.org()
-print(f"Organization: {org_info['name']}")
-print(f"Description: {org_info['description']}")
-print(f"Public Repos: {org_info['public_repos']}")
-
-# Get list of public repository names
-repos = client.public_repos()
-print(f"First 5 repositories: {repos[:5]}")
-```
-
-
+---
