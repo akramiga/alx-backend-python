@@ -2,7 +2,7 @@
 FROM python:3.10
 
 # Set working directory inside container
-WORKDIR /app
+WORKDIR /messaging_app
 
 # Copy dependency file
 COPY requirements.txt .
@@ -17,5 +17,5 @@ COPY . .
 EXPOSE 8000
 
 # Run Django development server (adjust for production later)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000","-p"]
 
