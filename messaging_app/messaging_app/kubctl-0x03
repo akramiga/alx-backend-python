@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# kubctl-0x03 - Apply updated deployment (version 2.0) and monitor rolling update
+
+DEPLOYMENT_NAME="django-blue"
+SERVICE_NAME="django-service"
+SERVICE_PORT=8000
+NAMESPACE="default"
+
+# Step 1: Apply updated deployment
+echo " Applying updated deployment (version 2.0)..."
+kubectl apply -f blue_deployment.yaml
+
+# Step 2: Monitor rolling update
+echo " Monitoring rolling update..."
+kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE
+
+# Step 3: Continuously test availability using curl
+echo " Testing availability..."
+END=$((SECONDS+30))  # test for 30 seconds
+while [ $SECONDS -lt $END ]; do
+    RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$SERVICE_PORT/)
+    echo "HTTP status: $RESPONSE"
+    sleep 1
+done &   # run in background
+
+# Step 4: Forward port (if needed) to make curl requests work
+kubectl port-forward service/$SERVICE_NAME $SERVICE_PORT:$SERVICE_PORT -n $NAMESPACE &
+PORT_FORWARD_PID=$!
+sleep 3  # wait for port-forward
+
+# Step 5: Verify updated pods
+echo " Current pods after update:"
+kubectl get pods -n $NAMESPACE
+
+# Step 6: Kill port-forward
+kill $PORT_FORWARD_PID
+
+echo "Rolling update completed successfully."
