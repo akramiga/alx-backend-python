@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# kurbeScript - Set up Kubernetes locally with Minikube
+
+
+
+# Step 1: Start Minikube cluster
+echo " Starting Minikube cluster..."
+minikube start --driver=docker
+
+if [ $? -ne 0 ]; then
+    echo " Failed to start Minikube cluster."
+    exit 1
+fi
+
+# Step 2: Verify cluster status
+echo " Verifying Kubernetes cluster status..."
+kubectl cluster-info
+
+if [ $? -ne 0 ]; then
+    echo " Kubernetes cluster is not responding."
+    exit 1
+fi
+
+# Step 3: List all pods in all namespaces
+echo " Retrieving all pods in the cluster..."
+kubectl get pods --all-namespaces
+
+echo "Kubernetes local cluster is up and running!"
