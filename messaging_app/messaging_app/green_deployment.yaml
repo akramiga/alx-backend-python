@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-green
+  labels:
+    app: django
+    version: green
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django
+      version: green
+  template:
+    metadata:
+      labels:
+        app: django
+        version: green
+    spec:
+      containers:
+        - name: django
+          image: your-dockerhub-username/messaging-web:green-latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MYSQL_USER
+              value: myuser
+            - name: MYSQL_PASSWORD
+              value: mypassword
+            - name: MYSQL_DATABASE
+              value: messaging_db
+            - name: MYSQL_HOST
+              value: mysql-service
+            - name: MYSQL_PORT
+              value: "3306"
