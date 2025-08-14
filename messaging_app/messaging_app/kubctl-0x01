@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# kubctl-0x01 - Scale Django deployment and perform basic load/resource testing
+
+# Step 0: Set variables
+DEPLOYMENT_NAME="django-web"       # Deployment to scale
+NAMESPACE="default"                # Namespace of deployment
+REPLICAS=3                         # Number of replicas to scale
+SERVICE_PORT=8000                   # Django service port
+SERVICE_NAME="django-service"      # Service to load test
+
+# Step 1: Scale the deployment
+echo "Scaling deployment '$DEPLOYMENT_NAME' to $REPLICAS replicas..."
+kubectl scale deployment $DEPLOYMENT_NAME --replicas=$REPLICAS -n $NAMESPACE
+
+# Step 2: Verify pods
+echo " Verifying pods after scaling..."
+kubectl get pods -n $NAMESPACE
+
+# Step 3: Port-forward service (optional for local load testing)
+echo " Port-forwarding $SERVICE_NAME to localhost:$SERVICE_PORT"
+kubectl port-forward svc/$SERVICE_NAME $SERVICE_PORT:$SERVICE_PORT -n $NAMESPACE &
+PORT_FORWARD_PID=$!
+sleep 5  # Wait a few seconds for port-forward to establish
+
+# Step 4: Perform load testing using wrk
+if command -v wrk &> /dev/null
+then
+    echo " Performing load testing using wrk..."
+    wrk -t2 -c10 -d15s http://127.0.0.1:$SERVICE_PORT/
+else
+    echo " wrk not installed. Skipping load test. Install it with 'sudo apt install wrk'."
+fi
+
+# Step 5: Kill port-forward process
+kill $PORT_FORWARD_PID
+
+# Step 6: Monitor resource usage
+echo "Monitoring resource usage of pods..."
+if kubectl top pods &> /dev/null
+then
+    kubectl top pods -n $NAMESPACE
+else
+    echo "⚠ Metrics not available. Ensure Metrics Server is installed in your cluster."
+fi
+
+echo " Script completed."
