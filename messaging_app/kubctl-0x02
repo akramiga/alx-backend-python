@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# kubctl-0x02 - Deploy blue-green strategy and check for errors
+
+# Step 0: Apply Blue Deployment
+echo " Deploying blue version..."
+kubectl apply -f blue_deployment.yaml
+
+# Step 1: Apply Green Deployment
+echo " Deploying green version..."
+kubectl apply -f green_deployment.yaml
+
+# Step 2: Apply Service
+echo "Creating/Updating service..."
+kubectl apply -f kubeservice.yaml
+
+# Step 3: Wait for pods to be ready
+echo " Waiting for pods to be ready..."
+kubectl rollout status deployment/django-blue
+kubectl rollout status deployment/django-green
+
+# Step 4: Verify pods
+kubectl get pods
+
+# Step 5: Check logs for errors in green version
+echo " Checking logs of green deployment pods..."
+GREEN_PODS=$(kubectl get pods -l version=green -o jsonpath='{.items[*].metadata.name}')
+
+for pod in $GREEN_PODS; do
+    echo " Logs for pod: $pod"
+    kubectl logs $pod
+done
+
+echo "Blue-Green deployment script completed."
