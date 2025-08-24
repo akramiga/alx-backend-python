@@ -1,39 +1,46 @@
 #!/bin/bash
+# Script for zero-downtime rolling update.
 
-# kubctl-0x03 - Apply updated deployment (version 2.0) and monitor rolling update
+SERVICE_URL="http://127.0.0.1:8000"
 
-DEPLOYMENT_NAME="django-blue"
-SERVICE_NAME="django-service"
-SERVICE_PORT=8000
-NAMESPACE="default"
+# Applying the updated deployment file to trigger a rolling update
+echo "Starting a rolling update by applying the new 'blue_deployment.yaml'..."
+kubectl apply -f blue_deployment.yaml &
 
-# Step 1: Apply updated deployment
-echo " Applying updated deployment (version 2.0)..."
-kubectl apply -f blue_deployment.yaml
+# Continuously send requests to check for downtime
+echo "Starting continuous curl requests to test for downtime..."
+echo "If the application goes down, a 'Failed to connect...' messages should appear."
+echo "Press Ctrl+C to stop the curl loop."
 
-# Step 2: Monitor rolling update
-echo " Monitoring rolling update..."
-kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE
+# This loop runs in the background. It will send a request every 0.5 seconds.
+while true
+do
+    curl -s "$SERVICE_URL"
+    # The `curl -s` command makes it silent, so only the successful output is shown.
+    # If the app is down, curl will fail and output an error message.
+    sleep 0.5
+done &
 
-# Step 3: Continuously test availability using curl
-echo " Testing availability..."
-END=$((SECONDS+30))  # test for 30 seconds
-while [ $SECONDS -lt $END ]; do
-    RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$SERVICE_PORT/)
-    echo "HTTP status: $RESPONSE"
-    sleep 1
-done &   # run in background
+# Store the PID of the curl loop so we can kill it later.
+CURL_PID=$!
 
-# Step 4: Forward port (if needed) to make curl requests work
-kubectl port-forward service/$SERVICE_NAME $SERVICE_PORT:$SERVICE_PORT -n $NAMESPACE &
-PORT_FORWARD_PID=$!
-sleep 3  # wait for port-forward
+# Monitoring the update progress
+echo ""
+echo "Monitoring the rollout status of the deployment..."
+# 'kubectl rollout status' blocks until the rollout is complete,
+# whether successful or failed.
+kubectl rollout status deployment/messaging-app-blue
 
-# Step 5: Verify updated pods
-echo " Current pods after update:"
-kubectl get pods -n $NAMESPACE
+# Rolling update is complete, kill the curl loop
+echo "Rolling update is complete. The new pods are ready."
+kill $CURL_PID
+wait $CURL_PID 2>/dev/null
+echo "Stopping continuous curl requests."
 
-# Step 6: Kill port-forward
-kill $PORT_FORWARD_PID
+# Verifying the Rolling Update is Complete by checking the pods
+echo "Verifying pods and image versions:"
+kubectl get pods -l app=messaging-app -o=custom-columns=POD:metadata.name,IMAGE:spec.containers[0].image
+# This command will show the pod name and the image it's running.
+# for our case we should see 'messaging-app:2.0' as the image for all pods.
 
-echo "Rolling update completed successfully."
+echo "Script execution finished."

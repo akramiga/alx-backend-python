@@ -1,35 +1,43 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: django-blue
+  name: messaging-app-blue
   labels:
-    app: django
+    app: messaging-app
     version: blue
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: django
+      app: messaging-app
       version: blue
   template:
     metadata:
       labels:
-        app: django
+        app: messaging-app
         version: blue
     spec:
       containers:
-        - name: django
-          image: your-dockerhub-username/messaging-web:latest
+        - name: messaging-app
+          image: messaging-app:2.0
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
-          env:
-            - name: MYSQL_USER
-              value: myuser
-            - name: MYSQL_PASSWORD
-              value: mypassword
-            - name: MYSQL_DATABASE
-              value: messaging_db
-            - name: MYSQL_HOST
-              value: mysql-service
-            - name: MYSQL_PORT
-              value: "3306"
+          env: []
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
