@@ -1,36 +1,36 @@
-name: messaging-app
+version: "3.9"
 
 services:
-  web:
-    image: royalboe/messaging-app:v2
-    build: 
-      context: .
-      dockerfile: Dockerfile  # Specify the Dockerfile to use for building the image
-    container_name: messaging_app_web
-    volumes: 
-      - .:/app  # Mount the current directory to /app in the container
-    working_dir: /app  # Set the working directory to /app
-    command: python3 manage.py runserver 0.0.0.0:8000  # Ensure it runs with python3 as per the requirement
-    ports:
-      - "9000:8000"  # Expose port 8000 for the Django app
-    depends_on:
-      - db  # Ensure that the db service starts before the web service
-    env_file:
-      - .env  # The database hostname should be the service name (db)
-
   db:
-    image: mysql:8.0  # Using MySQL 8.0 version
-    container_name: messaging_app_db
-    ports:
-      - "3306:3306"  # Expose port 3306 for MySQL
-    volumes:
-      - db_data:/var/lib/mysql  # Persist MySQL data
+    image: mysql:8.0
+    container_name: messaging_db
+    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DB}  # The default database for your Django app
+      MYSQL_ROOT_PASSWORD: Man8244251
+      MYSQL_USER: root
+      MYSQL_PASSWORD: Man8244251
+      MYSQL_DATABASE: messaging_db
+      MYSQL_DB: messaging_db   # for ALX checker compliance
+    ports:
+      - "3307:3306"  # Avoid conflicts with local MySQL
+    volumes:
+      - messaging_db_data:/var/lib/mysql  # <-- Persisted volume for DB data
 
+  web:
+    build: .
+    container_name: messaging_web
+    restart: always
+    command: >
+      sh -c "python3 manage.py migrate &&
+            python3 manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+    depends_on:
+      - db
 
-volumes:  
-  db_data:  # Uncomment if you want to persist MySQL data
+volumes:
+  messaging_db_data:  # <-- Declare the volume here

@@ -1,123 +1,73 @@
-from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import (
-    IsAuthenticated, 
-    IsAdminUser, 
-    IsAuthenticatedOrReadOnly,
-    AllowAny
-    )
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.views import APIView
-from django_filters import rest_framework as filters
-from rest_framework import filters as filter
-
-
+from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import Conversation, Message, User
+from .serializers import ConversationSerializer, MessageSerializer
 from .permissions import IsParticipantOfConversation
-from .models import User, Message, Conversation
-from .serializers import UserSerializer, MessageSerializer, ConversationSerializer
 from .filters import MessageFilter
-from .pagination import CustomMessagePagination
+from .pagination import StandardResultsSetPagination
 
-class HealthCheckView(APIView):
-    def get(self, request):
-        return Response({"status": "OK"})
-
-
-class ExampleView(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-    print("INSIDE EXAMPLEVIEW GET")
-
-
-    def get(self, request, format=None):
-        return Response({
-            'user_id': request.user.user_id,
-            'email': request.user.email,
-            'auth': str(request.auth),
-        })
-
-
-# class ExampleView(viewsets.ModelViewSet):
-#     authentication_classes = [JWTAuthentication, SessionAuthentication, BasicAuthentication]
-#     permission_classes = [IsAuthenticated]
-#     queryset = User.objects.all()
-#     serializer_class = UserSerializer
-#     lookup_field = 'user_id'
-
-#     def list(self, request, *args, **kwargs):
-#         content = {
-#             'user': str(request.user),
-#             'auth': str(request.auth),
-#         }
-#         return Response(content)
-    
-
-# Create your views here.
-class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    filter_backends = [
-        filters.DjangoFilterBackend,
-        filter.SearchFilter,
-        filter.OrderingFilter
-        ]
-    search_fields = ['first_name', 'last_name', 'email']
-    # search_fields = ['=first_name', '=last_name', '=email'] exact matches
-    ordering_fields = ['last_seen']
-    ordering = ['first_name']
-    # permission_classes = [IsAuthenticated, IsAdminUser]
-
-
-    def get_permissions(self):
-        """ Set permissions based on action"""
-
-        # Allows anyone to create an account
-        # but restricts other actions to authenticated users
-        # and admin users for update/delete actions.
-        if self.action == 'create':
-            self.permission_classes = [AllowAny]
-        elif self.action in ['update', 'partial_update', 'destroy']:
-            self.permission_classes = [IsAuthenticated, IsAdminUser]
-        elif self.action in ['list', 'retrieve']:
-            self.permission_classes = [IsAuthenticated]
-        else:
-            self.permission_classes = [IsAuthenticated]
-        return super().get_permissions()
-
-class MessageViewSet(viewsets.ModelViewSet):
-    queryset = Message.objects.prefetch_related(
-        'sender',
-        'conversation'
-    ).all()
-    serializer_class = MessageSerializer
-    permission_classes = [IsAuthenticated, IsParticipantOfConversation]
-    filterset_class = MessageFilter
-    pagination_class = CustomMessagePagination
-
-    def get_queryset(self):
-        """
-        To get messages that the user can read
-        """
-        qs = super().get_queryset()
-        return qs.filter(conversation__participants__user_id=self.request.user.user_id)
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    queryset = Conversation.objects.prefetch_related(
-        'messages', 
-        'participant_links', 
-        'participants', 
-        'messages__sender',
-        'messages__conversation'
-        ).all()
+    queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated, IsParticipantOfConversation]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['participants__username']
+
+    def create(self, request, *args, **kwargs):
+        participant_ids = request.data.get('participants', [])
+        if not participant_ids:
+            return Response({'error': 'participants field is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        participants = User.objects.filter(user_id__in=participant_ids)
+        if participants.count() != len(participant_ids):
+            return Response({'error': 'One or more user_ids are invalid'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if request.user.user_id not in participant_ids:
+            return Response({'error': 'You must be one of the participants'}, status=status.HTTP_403_FORBIDDEN)
+
+        conversation = Conversation.objects.create()
+        conversation.participants.set(participants)
+        serializer = self.get_serializer(conversation)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class MessageViewSet(viewsets.ModelViewSet):
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_class = MessageFilter
+    search_fields = ['conversation__id', 'sender__username']
 
     def get_queryset(self):
-        """
-        To get only conversations that the user is a participant of
-        """
-        qs = super().get_queryset()
-        print(self.request.user.user_id)
-        # return super().get_queryset()
-        return qs.filter(participants__user_id=self.request.user.user_id)
+        return Message.objects.filter(conversation__participants=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        conversation_id = request.data.get('conversation')
+        sender_id = request.data.get('sender')
+        message_body = request.data.get('message_body')
+
+        if not all([conversation_id, sender_id, message_body]):
+            return Response({'error': 'conversation, sender, and message_body are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        conversation = get_object_or_404(Conversation, conversation_id=conversation_id)
+        sender = get_object_or_404(User, user_id=sender_id)
+
+        if request.user != sender:
+            return Response({'error': 'Sender must match authenticated user'}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.user not in conversation.participants.all():
+            return Response({'error': 'You are not a participant in this conversation.'}, status=status.HTTP_403_FORBIDDEN)
+
+        message = Message.objects.create(
+            sender=sender,
+            conversation=conversation,
+            message_body=message_body
+        )
+        serializer = self.get_serializer(message)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -11,6 +11,11 @@ spec:
     matchLabels:
       app: messaging-app
       version: blue
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
@@ -19,25 +24,25 @@ spec:
     spec:
       containers:
         - name: messaging-app
-          image: messaging-app:2.0
-          imagePullPolicy: IfNotPresent
+          image: lusanda01/messaging-app:2.0   # <-- Updated image version
           ports:
             - containerPort: 8000
-          env: []
-          livenessProbe:
-            tcpSocket:
-              port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            tcpSocket:
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 5
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: messaging_app.settings
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: messaging-app-service
+  labels:
+    app: messaging-app
+spec:
+  type: ClusterIP
+  selector:
+    app: messaging-app
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
